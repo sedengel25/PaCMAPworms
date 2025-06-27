@@ -1,0 +1,2 @@
+file,dimred_method,target_dim,min_cluster_size,min_samples,n_neighbors,noise_mult,DR,n_points,n_clusters_orig,n_noise_orig,ARI_orig,DBCV_orig,n_clusters_embedded,n_noise_embedded,ARI_embedded,DBCV_embedded_m,DBCV_embedded_e
+data/worms_highD_orig_25id_50nm_10d_4.txt,PaCMAP,6,500,500,10,50,PaCMAP,12596,2,4739,0.06254969924961534,0.10722682803265168,2,285,0.03716614647957379,-0.8723249084743363,-0.9208753512126857

@@ -22,7 +22,7 @@ def process_config(row):
     X = np.loadtxt(filename)
     X = X.astype(np.float64)
     n_points = X.shape[0]
-    labels_file = row['file'].replace('_mapped_', '_labels_')
+    labels_file = row['file'].replace('highD_orig', 'labels')
     y_true = np.loadtxt(labels_file).astype(int)
 
     # ─── 2) HDBSCAN auf die gemappten (2D/10D/…) Daten ──────────────────────────
@@ -37,7 +37,7 @@ def process_config(row):
     n_clusters_m = len(set(labels_pred_mapped)) - (1 if -1 in labels_pred_mapped else 0)
 
     # speichere die gemappten Prädiktionen
-    pred_mapped_file = row['file'].replace('_mapped_', '_labels_pred_mapped_')
+    pred_mapped_file = row['file'].replace('highD_orig', 'labels_pred_highD_orig')
     np.savetxt(pred_mapped_file, labels_pred_mapped, fmt='%d')
 
     # ─── 3) DimRed auswählen und anwenden ───────────────────────────────────────
@@ -61,7 +61,7 @@ def process_config(row):
 
     X_red = X_red.astype(np.float64)
     # speichere das embedding mit target_dim im Dateinamen
-    embedded_file = row['file'].replace('_mapped_', f'_embedded_{target_dim}d_')
+    embedded_file = row['file'].replace('highD_orig', f'embedded_{target_dim}d')
     np.savetxt(embedded_file, X_red, fmt='%.6f')
 
     # ─── 4) HDBSCAN auf das Embedded ────────────────────────────────────────────
@@ -74,7 +74,7 @@ def process_config(row):
     n_clusters_r = len(set(labels_pred_red)) - (1 if -1 in labels_pred_red else 0)
 
     # speichere die embedded Prädiktionen
-    pred_red_file = row['file'].replace('_mapped_', '_labels_pred_embedded_')
+    pred_red_file = row['file'].replace('highD_orig', 'labels_pred_embedded')
     np.savetxt(pred_red_file, labels_pred_red, fmt='%d')
 
     # ─── 5) Ergebnisse in Dict packen ──────────────────────────────────────────

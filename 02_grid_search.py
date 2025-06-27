@@ -5,7 +5,7 @@ import glob
 import pandas as pd
 
 # 1. Alle Files mit "_mapped_" im aktuellen Verzeichnis finden
-embedded_files = glob.glob("data/*_mapped_*")
+embedded_files = glob.glob("data/*highD_orig*")
 
 # 2. Parameterräume definieren
 dimred_methods      = ["tSNE", "UMAP", "TriMap", "PaCMAP"]
