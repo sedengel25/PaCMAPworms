@@ -12,11 +12,16 @@ from sklearn.metrics import adjusted_rand_score
 from hdbscan import validity
 import argparse
 import sys
+import glob, re
 
 def process_config(row):
     # ─── 1) Daten laden ─────────────────────────────────────────────────────────
-    X = np.loadtxt(row['file'])
+    filename = row['file']
+    m = re.search(r'_(\d+)nm', filename)
+    nm = int(m.group(1))
+    X = np.loadtxt(filename)
     X = X.astype(np.float64)
+    n_points = X.shape[0]
     labels_file = row['file'].replace('_mapped_', '_labels_')
     y_true = np.loadtxt(labels_file).astype(int)
 
@@ -38,6 +43,7 @@ def process_config(row):
     # ─── 3) DimRed auswählen und anwenden ───────────────────────────────────────
     method     = row['dimred_method']
     target_dim = int(row['target_dim'])
+    nn = int(row['n_neighbors'])
     if method == 'tSNE':
         dr = TSNE(n_components=target_dim, init='random', random_state=42)
         X_red = dr.fit_transform(X)
@@ -48,15 +54,14 @@ def process_config(row):
         dr = trimap.TRIMAP(n_dims=target_dim)
         X_red = dr.fit_transform(X)
     elif method == 'PaCMAP':
-        nn = int(row['n_neighbors'])
         dr = pacmap.PaCMAP(n_components=target_dim, n_neighbors=nn, random_state=42)
         X_red = dr.fit_transform(X)
     else:
         raise ValueError(f"Unknown dimred method: {method}")
 
-    X_red = X_red.astype(np.float64) 
-    # speichere das embedding
-    embedded_file = row['file'].replace('_mapped_', '_embedded_')
+    X_red = X_red.astype(np.float64)
+    # speichere das embedding mit target_dim im Dateinamen
+    embedded_file = row['file'].replace('_mapped_', f'_embedded_{target_dim}d_')
     np.savetxt(embedded_file, X_red, fmt='%.6f')
 
     # ─── 4) HDBSCAN auf das Embedded ────────────────────────────────────────────
@@ -75,10 +80,18 @@ def process_config(row):
     # ─── 5) Ergebnisse in Dict packen ──────────────────────────────────────────
     return {
         **row.to_dict(),
-        'n_clusters_mapped':  n_clusters_m,
-        'n_noise_mapped':     n_noise_m,
-        'ARI_mapped':         ari_mapped,
-        'DBCV_mapped':        dbcv_mapped,
+        'file': filename,
+        'noise_mult': nm,
+        'DR': method,
+        'target_dim':target_dim,
+        'min_cluster_size':mcs,
+        'min_samples':ms,
+        'n_neighbors': nn,
+        'n_points': n_points,
+        'n_clusters_orig':  n_clusters_m,
+        'n_noise_orig':     n_noise_m,
+        'ARI_orig':         ari_mapped,
+        'DBCV_orig':        dbcv_mapped,
         'n_clusters_embedded': n_clusters_r,
         'n_noise_embedded':    n_noise_r,
         'ARI_embedded':        ari_red,
@@ -86,20 +99,38 @@ def process_config(row):
         'DBCV_embedded_e':       dbcv_red_e,
     }
 
-def main(grid_csv, results_csv):
+def main(grid_csv, out_prefix, idx):
+    # 1. Grid einlesen
     df = pd.read_csv(grid_csv)
-    results = []
-    for _, row in df.iterrows():
-        results.append(process_config(row))
-        break
-    out_df = pd.DataFrame(results)
-    out_df.to_csv(results_csv, index=False)
-    print(f"Wrote results to {results_csv}")
+    total = len(df)
+    if idx < 0 or idx >= total:
+        raise IndexError(f"Index {idx} außerhalb der Grid-Länge {total}")
+    # Bestimme Breite für Null-Padding basierend auf Anzahl der Konfigurationen
+    width = len(str(total - 1))
+    row = df.iloc[idx]
+
+    # 2. Eine Konfiguration verarbeiten
+    res = process_config(row)
+    print(res)
+    out_df = pd.DataFrame([res])
+
+    # 3. Job-spezifische CSV schreiben
+    out_file = f"{out_prefix}_{idx:0{width}d}.csv"
+    out_df.to_csv(out_file, index=False)
+    print(f"Wrote partial results to {out_file}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run DR+HDBSCAN per config")
-    parser.add_argument('--grid', type=str, default='grid_search.csv')
-    parser.add_argument('--out',  type=str, default='results.csv')
+    parser = argparse.ArgumentParser(description="Run one DR+HDBSCAN job per grid row")
+    parser.add_argument('--grid',   type=str, default='grid_search.csv',
+                        help="Input CSV mit allen Konfigurationen")
+    parser.add_argument('--out',    type=str, default='result',
+                        help="Prefix für die Ausgabe-CSV (erhält _00001.csv etc.)")
+    parser.add_argument('--index',  type=int, default=1000,
+                        help="Welche Zeile aus dem Grid zu verarbeiten ist")
     args = parser.parse_args()
-    main(args.grid, args.out)
+
+    # 4. Index wählen: CLI-Argument oder SLURM_ARRAY_TASK_ID
+    if args.index is None:
+        args.index = int(os.environ.get('SLURM_ARRAY_TASK_ID', 0))  # Fallback 0
+    main(args.grid, args.out, args.index)
     sys.exit(0)

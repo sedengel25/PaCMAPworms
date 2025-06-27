@@ -9,7 +9,7 @@ import argparse
 from sklearn.preprocessing import StandardScaler
 import plotly.graph_objects as go
 import sys
-
+import os
 def gen_one_worm(c, var_range, numsteps, steepness, nump, num_noisep, stepl, c_trail, tree, cluster_id, noise_mult, n_collision):
     dims = c.shape[0]
     new_cs = []
@@ -163,11 +163,14 @@ def generate_worm_datasets_batch(
     ):
     
     base_ds_id = 1
+    os.makedirs("data", exist_ok=True)
+    os.makedirs("img", exist_ok=True)
+
     for noise_mult in noise_mult_list:
         effective_noisep = 0 if noise_mult == 0 else num_noisep
         for output_dim in output_dims_list:
             for i in range(datasets_per_combo):
-                ds_id = f"{base_ds_id:02d}_{noise_mult}nm_{output_dim}d_{i}"
+                ds_id = f"{base_ds_id:02d}id_{noise_mult}nm_{output_dim}d_{i}"
                 base_ds_id += 1
                 print(f"\n=== Generating ds_id {ds_id} (noise_mult={noise_mult}, output_dim={output_dim}) ===")
                 
@@ -191,7 +194,7 @@ def generate_worm_datasets_batch(
 
 
                 # 3️⃣ Save original normalized data
-                original_fname = f"worms_original_{ds_id}.txt"
+                original_fname = f"data/worms_2D_orig_{ds_id}.txt"
                 print(X_scaled.shape)
                 np.savetxt(original_fname, X_scaled, fmt="%.6f")
                 print(f"Saved normalized original data: {original_fname}")
@@ -204,7 +207,7 @@ def generate_worm_datasets_batch(
                 plt.xlabel("Feature 1")
                 plt.ylabel("Feature 2")
                 plt.colorbar(label="Cluster ID")
-                plot2d_name = f"worms_2dplot_{ds_id}.png"
+                plot2d_name = f"img/worms_2D_plot_{ds_id}.png"
                 plt.tight_layout()
                 plt.savefig(plot2d_name)
                 plt.close()
@@ -214,18 +217,18 @@ def generate_worm_datasets_batch(
                 # 4️⃣ Embed to higher dimension
                 X_mapped = embed_2d_data(X_scaled, output_dim=output_dim)
                 print(X_mapped.shape)
-                embed_fname = f"worms_mapped_{ds_id}.txt"
+                embed_fname = f"data/worms_highD_orig_{ds_id}.txt"
                 np.savetxt(embed_fname, X_mapped, fmt="%.6f")
                 print(f"Saved mapped data: {embed_fname}")
 
                 if output_dim == 3:
                     X_mapped_3d = X_mapped
-                    embed_3d_fname = f"worms_vis3d_{ds_id}.txt"
+                    embed_3d_fname = f"data/worms_3D_vis{ds_id}.txt"
                     np.savetxt(embed_3d_fname, X_mapped_3d, fmt="%.6f")
                     print(f"Saved 3D mapped data for visualization: {embed_3d_fname}")
                 else:
                     X_mapped_3d = embed_2d_data(X_scaled, output_dim=3)
-                    embed_3d_fname = f"worms_vis3d_{ds_id}.txt"
+                    embed_3d_fname = f"data/worms_3D_vis{ds_id}.txt"
                     np.savetxt(embed_3d_fname, X_mapped_3d, fmt="%.6f")
                     print(f"Saved 3D mapped data for visualization: {embed_3d_fname}")
 
@@ -255,13 +258,13 @@ def generate_worm_datasets_batch(
                     margin=dict(l=0, r=0, b=0, t=30)
                 )
 
-                html_fname = f"worms_3dplot_{ds_id}.html"
+                html_fname = f"img/worms_3D_plot_{ds_id}.html"
                 fig.write_html(html_fname)
                 print(f"Saved interactive 3D plot: {html_fname}")
 
 
                 # 6️⃣ Save labels
-                label_fname = f"worms_labels_{ds_id}.txt"
+                label_fname = f"data/worms_labels_{ds_id}.txt"
                 print(labels.shape)
                 np.savetxt(label_fname, labels.astype(int), fmt="%d")
                 print(f"Saved labels: {label_fname}")

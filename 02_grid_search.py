@@ -5,7 +5,7 @@ import glob
 import pandas as pd
 
 # 1. Alle Files mit "_mapped_" im aktuellen Verzeichnis finden
-embedded_files = glob.glob("*_mapped_*")
+embedded_files = glob.glob("data/*_mapped_*")
 
 # 2. Parameterräume definieren
 dimred_methods      = ["tSNE", "UMAP", "TriMap", "PaCMAP"]
@@ -40,7 +40,7 @@ for file in embedded_files:
                             "target_dim":          target_dim,
                             "min_cluster_size":  mcs,
                             "min_samples":       ms,
-                            "n_neighbors":       None
+                            "n_neighbors":       0
                         })
 
 # 4. DataFrame und CSV schreiben
