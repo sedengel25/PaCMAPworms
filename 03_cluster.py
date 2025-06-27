@@ -45,7 +45,11 @@ def process_config(row):
     target_dim = int(row['target_dim'])
     nn = int(row['n_neighbors'])
     if method == 'tSNE':
-        dr = TSNE(n_components=target_dim, init='random', random_state=42)
+        # Für n_components > 3 den "exact"-Algorithmus nutzen
+        if target_dim > 3:
+            dr = TSNE(n_components=target_dim, init='random', random_state=42, method='exact')
+        else:
+            dr = TSNE(n_components=target_dim, init='random', random_state=42)
         X_red = dr.fit_transform(X)
     elif method == 'UMAP':
         dr = umap.UMAP(n_components=target_dim, random_state=42)
@@ -80,13 +84,13 @@ def process_config(row):
     # ─── 5) Ergebnisse in Dict packen ──────────────────────────────────────────
     return {
         **row.to_dict(),
-        'file': filename,
+        #'file': filename,
         'noise_mult': nm,
-        'DR': method,
-        'target_dim':target_dim,
-        'min_cluster_size':mcs,
-        'min_samples':ms,
-        'n_neighbors': nn,
+        #'DR': method,
+        #'target_dim':target_dim,
+        #'min_cluster_size':mcs,
+        #'min_samples':ms,
+        #'n_neighbors': nn,
         'n_points': n_points,
         'n_clusters_orig':  n_clusters_m,
         'n_noise_orig':     n_noise_m,
@@ -115,7 +119,8 @@ def main(grid_csv, out_prefix, idx):
     out_df = pd.DataFrame([res])
 
     # 3. Job-spezifische CSV schreiben
-    out_file = f"{out_prefix}_{idx:0{width}d}.csv"
+    os.makedirs("results", exist_ok=True)
+    out_file = f"results/{out_prefix}_{idx:0{width}d}.csv"
     out_df.to_csv(out_file, index=False)
     print(f"Wrote partial results to {out_file}")
 
@@ -123,9 +128,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run one DR+HDBSCAN job per grid row")
     parser.add_argument('--grid',   type=str, default='grid_search.csv',
                         help="Input CSV mit allen Konfigurationen")
-    parser.add_argument('--out',    type=str, default='result',
+    parser.add_argument('--out',    type=str, default='res',
                         help="Prefix für die Ausgabe-CSV (erhält _00001.csv etc.)")
-    parser.add_argument('--index',  type=int, default=1000,
+    parser.add_argument('--index',  type=int, default=123,
                         help="Welche Zeile aus dem Grid zu verarbeiten ist")
     args = parser.parse_args()
 
