@@ -12,7 +12,7 @@ import sys
 import os
 from datetime import datetime
 
-RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M")
+RUN_ID = datetime.now().strftime("%Y%m%d_%H%M")
 BASE_PATH = os.path.join("runs", RUN_ID)
 
 def gen_one_worm(c, var_range, numsteps, steepness, nump, num_noisep, stepl, c_trail, tree, cluster_id, noise_mult, n_collision):

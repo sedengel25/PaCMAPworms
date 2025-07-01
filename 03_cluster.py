@@ -15,7 +15,7 @@ import sys
 import re
 
 # 🔹 Fester, testfreundlicher Default für lokale Läufe
-RUN_PATH_DEFAULT = "runs/run_20250701_1454"
+RUN_PATH_DEFAULT = "20250701_1549"
 
 def remove_last_postfix_before_extension(filename):
     """
@@ -31,6 +31,7 @@ def remove_last_postfix_before_extension(filename):
     return base_clean, ext
 
 def process_config(row, run_path):
+
     filename_rel = row['file']  # enthält z.B. "04_0nm_03run_10d.txt"
     base_clean, ext = remove_last_postfix_before_extension(filename_rel)
     dir_path = os.path.join(run_path, "data", "highmapped_xd")
@@ -119,8 +120,8 @@ def process_config(row, run_path):
         'DBCV_embedded_e': dbcv_red_e,
     }
 
-def main(run_path, out_prefix, idx):
-    run_id = os.path.basename(run_path)
+def main(run_id, out_prefix, idx):
+    run_path = os.path.join("runs", run_id)
     grid_csv = os.path.join(run_path, f"grid_search_{run_id}.csv")
 
     df = pd.read_csv(grid_csv)
@@ -142,8 +143,8 @@ def main(run_path, out_prefix, idx):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run DR+HDBSCAN on one grid row within a run folder.")
-    parser.add_argument('--run_path', type=str, default=RUN_PATH_DEFAULT,
-                        help="Pfad zum Run-Ordner, z.B. runs/run_20250701_1454")
+    parser.add_argument('--run_id', type=str, default=RUN_PATH_DEFAULT,
+                        help="Pfad zum Run-Ordner, z.B. 20250701_1454")
     parser.add_argument('--out', type=str, default='res',
                         help="Prefix für Ergebnisdateien")
     parser.add_argument('--index', type=int, default=1,
@@ -151,5 +152,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     idx = args.index if args.index is not None else int(os.environ.get('SLURM_ARRAY_TASK_ID', 0))
-    main(args.run_path, args.out, idx)
+    main(args.run_id, args.out, idx)
     sys.exit(0)
