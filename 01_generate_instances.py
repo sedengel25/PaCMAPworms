@@ -10,6 +10,11 @@ from sklearn.preprocessing import StandardScaler
 import plotly.graph_objects as go
 import sys
 import os
+from datetime import datetime
+
+RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M")
+BASE_PATH = os.path.join("runs", RUN_ID)
+
 def gen_one_worm(c, var_range, numsteps, steepness, nump, num_noisep, stepl, c_trail, tree, cluster_id, noise_mult, n_collision):
     dims = c.shape[0]
     new_cs = []
@@ -76,7 +81,7 @@ def gen_one_worm(c, var_range, numsteps, steepness, nump, num_noisep, stepl, c_t
 
 
 
-def gen_2d_worms(ds_id=1, max_clusters=10, nump=10, num_noisep=4, stepl=2, dims = 2, start_var = 1, end_var = 120, noise_mult = 8):
+def gen_2d_worms(max_clusters=10, nump=10, num_noisep=4, stepl=2, dims = 2, start_var = 1, end_var = 120, noise_mult = 8):
     X_blocks = []
     label_blocks = []
     c_trail = []
@@ -124,59 +129,58 @@ def gen_2d_worms(ds_id=1, max_clusters=10, nump=10, num_noisep=4, stepl=2, dims 
 
 
 def normalize1(data):
-    return (data - data.mean()) / (data.std() * 0.7) #2 * (data - data.min()) / (data.max() - data.min()) - 1
+    return (data - data.mean()) / (data.std() * 0.7)
 
-def embed_2d_data(h, hidden_dim=100, output_dim=3, n_hidden_layers=12, seed=44):
+def embed_2d_data(data, hidden_dim=100, output_dim=3, n_hidden_layers=12, seed=44):
     rng = np.random.default_rng(seed)
-
     W_in = rng.standard_normal((hidden_dim, 2))
-    hidden_weights = [rng.standard_normal((hidden_dim, hidden_dim))
-                      for _ in range(n_hidden_layers - 1)]
+    hidden_weights = [rng.standard_normal((hidden_dim, hidden_dim)) for _ in range(n_hidden_layers - 1)]
     U = rng.standard_normal((output_dim, hidden_dim))
-
-    X = normalize1(h.dot(W_in.T))
+    X = normalize1(data @ W_in.T)
     X = np.tanh(X)
-
-    for i, W_h in enumerate(hidden_weights):
-        X = normalize1(X.dot(W_h.T))
+    for W_h in hidden_weights:
+        X = normalize1(X @ W_h.T)
         X = np.tanh(X)
-
-    X = normalize1(X.dot(U.T))
+    X = normalize1(X @ U.T)
     X = np.tanh(X)
-
     return X
 
+def setup_folders(base_path):
+    os.makedirs(os.path.join(base_path, "data/raw_2d"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "data/highmapped_xd"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "data/highmapped_3d"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "data/true_labels"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "plots/2d_png"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "plots/3d_html"), exist_ok=True)
 
 
 def generate_worm_datasets_batch(
-        noise_mult_list = [0, 5, 10, 20, 50],
-        output_dims_list = [3, 5, 10],
-        datasets_per_combo = 5,
-        base_ds_id = 1,
-        max_clusters = 10,
-        nump = 10,
-        num_noisep = 4,
-        stepl = 2,
-        dims = 2,
-        start_var = 1,
-        end_var = 120
+        base_path,
+        noise_mult_list=[0, 5, 10, 20, 50],
+        output_dims_list=[3, 5, 10],
+        datasets_per_combo=5,
+        base_ds_id=1,
+        max_clusters=10,
+        nump=10,
+        num_noisep=4,
+        stepl=2,
+        dims=2,
+        start_var=1,
+        end_var=120
     ):
-    
-    base_ds_id = 1
-    os.makedirs("data", exist_ok=True)
-    os.makedirs("img", exist_ok=True)
+
+    setup_folders(base_path)
+
 
     for noise_mult in noise_mult_list:
         effective_noisep = 0 if noise_mult == 0 else num_noisep
         for output_dim in output_dims_list:
-            for i in range(datasets_per_combo):
-                ds_id = f"{base_ds_id:02d}id_{noise_mult}nm_{output_dim}d_{i}"
+            for run in range(datasets_per_combo):
+                ds_id_prefix = f"{base_ds_id:02d}_{noise_mult}nm"
                 base_ds_id += 1
-                print(f"\n=== Generating ds_id {ds_id} (noise_mult={noise_mult}, output_dim={output_dim}) ===")
-                
-                # 1️⃣ Generate worm dataset
+                print(f"\n=== Generating ds_id {ds_id_prefix} (noise_mult={noise_mult}, output_dim={output_dim}) ===")
+
                 X, labels, n_clusters = gen_2d_worms(
-                    ds_id=ds_id,
                     max_clusters=max_clusters,
                     nump=nump,
                     num_noisep=effective_noisep,
@@ -186,96 +190,42 @@ def generate_worm_datasets_batch(
                     end_var=end_var,
                     noise_mult=noise_mult
                 )
-                
-                # 2️⃣ Normalize
+
                 scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X)
 
+                np.savetxt(os.path.join(base_path,f"data/raw_2d/{ds_id_prefix}_{run:02d}run_2d.txt"), X_scaled, fmt="%.6f")
 
-
-                # 3️⃣ Save original normalized data
-                original_fname = f"data/worms_2D_orig_{ds_id}.txt"
-                print(X_scaled.shape)
-                np.savetxt(original_fname, X_scaled, fmt="%.6f")
-                print(f"Saved normalized original data: {original_fname}")
-
-                plt.figure(figsize=(6,6))
-                # labels[:,0] enthält die cluster_id
-                plt.scatter(X_scaled[:, 0], X_scaled[:, 1],
-                            c=labels, cmap="tab10", s=5, alpha=0.05)
-                plt.title(f"Original 2D worms (ds_id={ds_id})")
+                plt.figure(figsize=(6, 6))
+                plt.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels, cmap="tab10", s=5, alpha=0.05)
+                plt.title(f"2D Worms {ds_id_prefix}")
                 plt.xlabel("Feature 1")
                 plt.ylabel("Feature 2")
                 plt.colorbar(label="Cluster ID")
-                plot2d_name = f"img/worms_2D_plot_{ds_id}.png"
                 plt.tight_layout()
-                plt.savefig(plot2d_name)
+                plt.savefig(os.path.join(base_path,f"plots/2d_png/{ds_id_prefix}_{run:02d}run_2d.png"), dpi=150)
                 plt.close()
-                print(f"Saved 2D scatter plot: {plot2d_name}")
 
-
-                # 4️⃣ Embed to higher dimension
                 X_mapped = embed_2d_data(X_scaled, output_dim=output_dim)
-                print(X_mapped.shape)
-                embed_fname = f"data/worms_highD_orig_{ds_id}.txt"
-                np.savetxt(embed_fname, X_mapped, fmt="%.6f")
-                print(f"Saved mapped data: {embed_fname}")
+                np.savetxt(os.path.join(base_path,f"data/highmapped_xd/{ds_id_prefix}_{run:02d}run_{output_dim}d.txt"), X_mapped, fmt="%.6f")
 
-                if output_dim == 3:
-                    X_mapped_3d = X_mapped
-                    embed_3d_fname = f"data/worms_3D_vis{ds_id}.txt"
-                    np.savetxt(embed_3d_fname, X_mapped_3d, fmt="%.6f")
-                    print(f"Saved 3D mapped data for visualization: {embed_3d_fname}")
-                else:
-                    X_mapped_3d = embed_2d_data(X_scaled, output_dim=3)
-                    embed_3d_fname = f"data/worms_3D_vis{ds_id}.txt"
-                    np.savetxt(embed_3d_fname, X_mapped_3d, fmt="%.6f")
-                    print(f"Saved 3D mapped data for visualization: {embed_3d_fname}")
+                X_3d = X_mapped if output_dim == 3 else embed_2d_data(X_scaled, output_dim=3)
+                np.savetxt(os.path.join(base_path,f"data/highmapped_3d/{ds_id_prefix}_{run:02d}run_3d.txt"), X_3d, fmt="%.6f")
+                
 
                 fig = go.Figure(data=[
                     go.Scatter3d(
-                        x=X_mapped_3d[:, 0],
-                        y=X_mapped_3d[:, 1],
-                        z=X_mapped_3d[:, 2],
+                        x=X_3d[:, 0],
+                        y=X_3d[:, 1],
+                        z=X_3d[:, 2],
                         mode='markers',
-                        marker=dict(
-                            size=3,
-                            color=labels,
-                            colorscale='Viridis',
-                            opacity=0.8,
-                            showscale=True,
-                            colorbar=dict(title='Cluster ID')
-                        )
+                        marker=dict(size=3, color=labels, colorscale='Viridis', opacity=0.8, showscale=True, colorbar=dict(title='Cluster ID'))
                     )
                 ])
-                fig.update_layout(
-                    title=f"3D Embedding (ds_id={ds_id})",
-                    scene=dict(
-                        xaxis_title='Dim 1',
-                        yaxis_title='Dim 2',
-                        zaxis_title='Dim 3'
-                    ),
-                    margin=dict(l=0, r=0, b=0, t=30)
-                )
+                fig.update_layout(title=f"3D Embedding {ds_id_prefix}", scene=dict(xaxis_title='Dim 1', yaxis_title='Dim 2', zaxis_title='Dim 3'))
+                fig.write_html(os.path.join(base_path,f"plots/3d_html/{ds_id_prefix}_{run:02d}run_3d.html"))
 
-                html_fname = f"img/worms_3D_plot_{ds_id}.html"
-                fig.write_html(html_fname)
-                print(f"Saved interactive 3D plot: {html_fname}")
-
-
-                # 6️⃣ Save labels
-                label_fname = f"data/worms_labels_{ds_id}.txt"
-                print(labels.shape)
-                np.savetxt(label_fname, labels.astype(int), fmt="%d")
-                print(f"Saved labels: {label_fname}")
-                #sys.exit("break")
-                # 7️⃣ Compute and save pairwise distance matrix
-                # distmat = squareform(pdist(X_mapped))
-                # distmat_fname = f"worms_distmat_{output_dim}_{ds_id}.npy"
-                # np.save(distmat_fname, distmat)
-                # print(f"Saved distance matrix: {distmat_fname}")
-
-
+                np.savetxt(os.path.join(base_path,f"data/true_labels/{ds_id_prefix}_{run:02d}run_labels.txt"), labels.astype(int), fmt="%d")
 
 
 if __name__ == "__main__":
@@ -296,6 +246,7 @@ if __name__ == "__main__":
 
 
     generate_worm_datasets_batch(
+        base_path=BASE_PATH,
         noise_mult_list=noise_mult_list,
         output_dims_list=output_dims_list,
         datasets_per_combo=args.datasets_per_combo,
@@ -307,5 +258,3 @@ if __name__ == "__main__":
         nump=args.nump,
         num_noisep=args.num_noisep
     )
-
-

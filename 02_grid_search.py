@@ -4,22 +4,24 @@ import os
 import glob
 import pandas as pd
 
-# 1. Alle Files mit "highD_orig" im data-Verzeichnis finden
-embedded_files = glob.glob("data/*highD_orig*")
+RUN_PATH = "runs/run_20250701_1454"   
+RUN_ID = os.path.basename(RUN_PATH)
 
-# 2. Parameterräume definieren
+embedded_files = glob.glob(os.path.join(RUN_PATH, "data/highmapped_xd", "*"))
+
+
+
 dimred_methods      = ["tSNE", "UMAP", "TriMap", "PaCMAP"]
-# Für tSNE nur 2 und 3, sonst 2–10
 target_dims_all     = list(range(2, 11))   # 2 bis 10
 target_dims_tsne    = [2, 3]
 min_cluster_sizes   = [10, 50, 100, 200, 500, 1000]
 pacmap_n_neighbors  = [1, 2, 5, 10, 20, 40]
 
-# 3. Grid generieren
+
 configs = []
 for file in embedded_files:
+    file = os.path.basename(file)
     for method in dimred_methods:
-        # je nach Methode die target_dims wählen
         if method == "tSNE":
             target_dims = target_dims_tsne
         else:
@@ -27,8 +29,7 @@ for file in embedded_files:
 
         for target_dim in target_dims:
             for mcs in min_cluster_sizes:
-                # drei min_samples-Werte: 75%, 100%, 125% von mcs
-                samples_list = [round(mcs * 0.75), mcs, round(mcs * 1.25)]
+                samples_list = [round(mcs * 0.5), round(mcs * 0.75), mcs]
                 if method == "PaCMAP":
                     for nn in pacmap_n_neighbors:
                         for ms in samples_list:
@@ -53,6 +54,6 @@ for file in embedded_files:
 
 # 4. DataFrame und CSV schreiben
 df = pd.DataFrame(configs)
-out_csv = "grid_search.csv"
+out_csv = os.path.join(RUN_PATH, f"grid_search_{RUN_ID}.csv")
 df.to_csv(out_csv, index=False)
-print(f"Wrote configuration grid to {out_csv} ({len(df)} rows).")
+print(f"✅ Wrote configuration grid to {out_csv} ({len(df)} rows).")

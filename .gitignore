@@ -195,6 +195,4 @@ cython_debug/
 
 
 # Alles in den Ordnern img und data ignorieren
-/img/
-/data/
-/results/
+/runs/
