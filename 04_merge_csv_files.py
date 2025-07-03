@@ -29,7 +29,7 @@ def main():
         df = pd.concat([df, temp_df], ignore_index=True)
 
     # Ergebnis speichern
-    out_path = base_path.parent / f"merged_results_{run_id}.csv"
+    out_path = f"results_{run_id}.csv"
     df.to_csv(out_path, index=False)
     print(f"✔ {len(files)} Dateien zusammengeführt in '{out_path}'.")
 
