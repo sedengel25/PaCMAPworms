@@ -241,7 +241,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    noise_mult_list = [0, 5, 10, 20, 50]
+    noise_mult_list = [0,50]
     output_dims_list = [10]
 
 

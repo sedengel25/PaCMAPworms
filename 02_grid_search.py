@@ -22,7 +22,7 @@ embedded_files = [os.path.basename(file) for file in embedded_files]
 dimred_methods = ["tSNE", "UMAP", "TriMap", "PaCMAP"]
 target_dims_all = list(range(2, 11))      # 2 bis 10
 target_dims_tsne = [2, 3]
-min_cluster_sizes = [10, 50, 100, 200, 500, 1000]
+min_cluster_sizes = [2,4,8,16,32,64,128]
 pacmap_n_neighbors = [1, 2, 5, 10, 20, 40]
 
 # Grid generieren
