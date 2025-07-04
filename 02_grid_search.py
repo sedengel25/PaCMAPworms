@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
-
 import os
 import glob
-import pandas as pd
+import re
 import argparse
+import pandas as pd
 
 # Argumente parsen
 parser = argparse.ArgumentParser(description="Generate grid_search CSV for a specific run folder.")
-parser.add_argument("--run_id", type=str, default="20250701_1548",
+parser.add_argument("--run_id", type=str, default="20250701_1549",
                     help="ID des Runs, z.B. 20250701_1454")
 args = parser.parse_args()
 
@@ -16,26 +15,45 @@ RUN_PATH = os.path.join("runs", RUN_ID)
 
 # Highmapped XD Dateien finden
 embedded_files = glob.glob(os.path.join(RUN_PATH, "data/highmapped_xd", "*"))
-embedded_files = [os.path.basename(file) for file in embedded_files]
+embedded_files = [os.path.basename(f) for f in embedded_files]
 
-# Parameterraum definieren
-dimred_methods = ["tSNE", "UMAP", "TriMap", "PaCMAP"]
-target_dims_all = list(range(2, 11))      # 2 bis 10
-target_dims_tsne = [2, 3]
-min_cluster_sizes = [2,4,8,16,32,64,128]
-pacmap_n_neighbors = [1, 2, 5, 10, 20, 40]
+# Parameterraum
+dimred_methods      = ["tSNE", "UMAP", "TriMap", "PaCMAP"]
+min_cluster_sizes   = [2, 4, 8, 16, 32, 64, 128]
+pacmap_n_neighbors  = [1, 2, 5, 10, 20, 40]
 
-# Grid generieren
 configs = []
+
 for file in embedded_files:
+    # XD extrahieren
+    m = re.search(r'_(\d+)d\.txt$', file)
+    if not m:
+        print(f"Warning: could not extract XD from {file}, skipping.")
+        continue
+    xd = int(m.group(1))
+
+    # dynamische target_dims: [2, 25%, 50%, 75%, 100%] von xd
+    raw = [2,
+           int(round(0.25 * xd)),
+           int(round(0.5  * xd)),
+           int(round(0.75 * xd)),
+           xd]
+    target_dims = sorted(set([d for d in raw if d >= 2]))
+    print(target_dims)
+
     for method in dimred_methods:
-        target_dims = target_dims_tsne if method == "tSNE" else target_dims_all
-        for target_dim in target_dims:
+        # tSNE nur für 2D und 3D
+        if method == "tSNE":
+            method_dims = [d for d in target_dims if d in (2, 3)]
+        else:
+            method_dims = target_dims
+
+        for target_dim in method_dims:
             for mcs in min_cluster_sizes:
-                samples_list = [round(mcs * 0.5), round(mcs * 0.75), mcs]
+                samples = [round(mcs * 0.5), round(mcs * 0.75), mcs]
                 if method == "PaCMAP":
                     for nn in pacmap_n_neighbors:
-                        for ms in samples_list:
+                        for ms in samples:
                             configs.append({
                                 "file": file,
                                 "dimred_method": method,
@@ -45,7 +63,7 @@ for file in embedded_files:
                                 "n_neighbors": nn
                             })
                 else:
-                    for ms in samples_list:
+                    for ms in samples:
                         configs.append({
                             "file": file,
                             "dimred_method": method,
@@ -55,8 +73,9 @@ for file in embedded_files:
                             "n_neighbors": 0
                         })
 
-# DataFrame und CSV schreiben
+# Als CSV speichern
 df = pd.DataFrame(configs)
-out_csv = os.path.join(RUN_PATH, f"grid_search_{RUN_ID}.csv")
+out_csv = os.path.join(RUN_PATH, "grid_search.csv")
 df.to_csv(out_csv, index=False)
-print(f"✅ Wrote configuration grid to {out_csv} ({len(df)} rows).")
+print(f"Grid search CSV saved to: {out_csv}")
+
