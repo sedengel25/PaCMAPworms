@@ -146,10 +146,10 @@ def embed_2d_data(data, hidden_dim=100, output_dim=3, n_hidden_layers=12, seed=4
     return X
 
 def setup_folders(base_path):
-    os.makedirs(os.path.join(base_path, "data/raw_2d"), exist_ok=True)
-    os.makedirs(os.path.join(base_path, "data/highmapped_xd"), exist_ok=True)
-    os.makedirs(os.path.join(base_path, "data/highmapped_3d"), exist_ok=True)
-    os.makedirs(os.path.join(base_path, "data/true_labels"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "data/input/raw_2d"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "data/input/highmapped_xd"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "data/input/highmapped_3d"), exist_ok=True)
+    os.makedirs(os.path.join(base_path, "data/input/true_labels"), exist_ok=True)
     os.makedirs(os.path.join(base_path, "plots/2d_png"), exist_ok=True)
     os.makedirs(os.path.join(base_path, "plots/3d_html"), exist_ok=True)
 

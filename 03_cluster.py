@@ -34,13 +34,10 @@ def process_config(row, run_path):
 
     filename_rel = row['file']  # enthält z.B. "04_0nm_03run_10d.txt"
     base_clean, ext = remove_last_postfix_before_extension(filename_rel)
-    dir_path = os.path.join(run_path, "data", "highmapped_xd")
+    dir_path = os.path.join(run_path, "data", "input", "highmapped_xd")
     filename = os.path.join(dir_path, filename_rel)
-
-    print(filename_rel)
-    print(filename)
-    print(base_clean)
-    print(ext)
+    out_path = os.path.join(run_path, "data", "output") 
+    os.makedirs(out_path, exist_ok=True)         
 
     # Noise Mult extrahieren
     m = re.search(r'_(\d+)nm', filename_rel)
@@ -51,9 +48,9 @@ def process_config(row, run_path):
     n_points = X.shape[0]
 
     # Labels laden
-    labels_file = os.path.join(run_path, "data", "true_labels", f"{base_clean}_labels{ext}")
+    labels_file = os.path.join(run_path, "data", "input", "true_labels", f"{base_clean}_labels{ext}")
     if not os.path.exists(labels_file):
-        raise FileNotFoundError(f"❌ Labels file not found: {labels_file}")
+        raise FileNotFoundError(f"Labels file not found: {labels_file}")
     y_true = np.loadtxt(labels_file).astype(int)
 
     # HDBSCAN auf highD
@@ -68,7 +65,7 @@ def process_config(row, run_path):
     n_noise_m = int((labels_pred_mapped == -1).sum())
     n_clusters_m = len(set(labels_pred_mapped)) - (1 if -1 in labels_pred_mapped else 0)
 
-    pred_mapped_file = os.path.join(dir_path, f"{base_clean}_pred_labels{ext}")
+    pred_mapped_file = os.path.join(out_path, f"{base_clean}_pred_labels{ext}")
     np.savetxt(pred_mapped_file, labels_pred_mapped, fmt='%d')
 
     # DimRed
@@ -89,7 +86,7 @@ def process_config(row, run_path):
         raise ValueError(f"Unknown dimred method: {method}")
 
     X_red = dr.fit_transform(X).astype(np.float64)
-    embedded_file = os.path.join(dir_path, f"{base_clean}_{target_dim}d_emb{ext}")
+    embedded_file = os.path.join(out_path, f"{base_clean}_{target_dim}d_emb{ext}")
     np.savetxt(embedded_file, X_red, fmt='%.6f')
 
     # HDBSCAN auf Embedding
@@ -102,7 +99,7 @@ def process_config(row, run_path):
     n_noise_r = int((labels_pred_red == -1).sum())
     n_clusters_r = len(set(labels_pred_red)) - (1 if -1 in labels_pred_red else 0)
 
-    pred_red_file = os.path.join(dir_path, f"{base_clean}_{target_dim}d_emb_pred_labels{ext}")
+    pred_red_file = os.path.join(out_path, f"{base_clean}_{target_dim}d_emb_pred_labels{ext}")
     np.savetxt(pred_red_file, labels_pred_red, fmt='%d')
 
     # Ergebnisse zurückgeben
