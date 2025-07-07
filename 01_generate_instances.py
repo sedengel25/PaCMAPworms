@@ -241,8 +241,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    noise_mult_list = [0]
-    output_dims_list = [10, 100, 250, 1000, 2000]
+    noise_mult_list = [0,10,20,50,100]
+    output_dims_list = [10, 100, 1000]
 
 
     generate_worm_datasets_batch(

@@ -61,6 +61,7 @@ def process_config(row, run_path):
     ms = int(row['min_samples'])
     clusterer = hdbscan.HDBSCAN(min_cluster_size=mcs, min_samples=ms)
     labels_pred_mapped = clusterer.fit_predict(X)
+    labels_pred_mapped[labels_pred_mapped == -1] = 0
 
     ari_mapped = adjusted_rand_score(y_true, labels_pred_mapped)
     dbcv_mapped = validity.validity_index(X, labels_pred_mapped)
