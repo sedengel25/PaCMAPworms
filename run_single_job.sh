@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=00:30:00
-#SBATCH --exclude=n1016,n1048,n1159
+#SBATCH --exclude=n1016,n1048,n1159,n1616
 
 RUN_ID=$1
 

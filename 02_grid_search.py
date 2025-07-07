@@ -19,8 +19,8 @@ embedded_files = [os.path.basename(f) for f in embedded_files]
 
 # Parameterraum
 dimred_methods      = ["tSNE", "UMAP", "TriMap", "PaCMAP"]
-min_cluster_sizes   = [2, 4, 8, 16, 32, 64, 128]
-pacmap_n_neighbors  = [1, 2, 5, 10, 20, 40]
+min_cluster_sizes   = [10,20,30,40,50,60,70,80,90,100]
+pacmap_n_neighbors  = [10]
 
 configs = []
 
@@ -57,6 +57,7 @@ for file in embedded_files:
                             configs.append({
                                 "file": file,
                                 "dimred_method": method,
+                                "input_dim":xd,
                                 "target_dim": target_dim,
                                 "min_cluster_size": mcs,
                                 "min_samples": ms,
@@ -67,6 +68,7 @@ for file in embedded_files:
                         configs.append({
                             "file": file,
                             "dimred_method": method,
+                            "input_dim":xd,
                             "target_dim": target_dim,
                             "min_cluster_size": mcs,
                             "min_samples": ms,
@@ -75,7 +77,6 @@ for file in embedded_files:
 
 # Als CSV speichern
 df = pd.DataFrame(configs)
-out_csv = os.path.join(RUN_PATH, "grid_search.csv")
+out_csv = os.path.join(RUN_PATH, f"grid_search_{RUN_ID}.csv")
+print(len(df))
 df.to_csv(out_csv, index=False)
-print(f"Grid search CSV saved to: {out_csv}")
-
