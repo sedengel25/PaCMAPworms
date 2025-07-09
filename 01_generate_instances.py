@@ -176,7 +176,7 @@ def generate_worm_datasets_batch(
         effective_noisep = 0 if noise_mult == 0 else num_noisep
         for output_dim in output_dims_list:
             for run in range(datasets_per_combo):
-                ds_id_prefix = f"{base_ds_id:02d}_{noise_mult}nm"
+                ds_id_prefix = f"{base_ds_id:05d}_{noise_mult}nm"
                 base_ds_id += 1
                 print(f"\n=== Generating ds_id {ds_id_prefix} (noise_mult={noise_mult}, output_dim={output_dim}) ===")
 
@@ -194,7 +194,7 @@ def generate_worm_datasets_batch(
                 scaler = StandardScaler()
                 X_scaled = scaler.fit_transform(X)
 
-                np.savetxt(os.path.join(base_path,f"data/raw_2d/{ds_id_prefix}_{run:02d}run_2d.txt"), X_scaled, fmt="%.6f")
+                np.savetxt(os.path.join(base_path,f"data/input/raw_2d/{ds_id_prefix}_{run:05d}run_2d.txt"), X_scaled, fmt="%.6f")
 
                 plt.figure(figsize=(6, 6))
                 plt.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels, cmap="tab10", s=5, alpha=0.05)
@@ -203,14 +203,14 @@ def generate_worm_datasets_batch(
                 plt.ylabel("Feature 2")
                 plt.colorbar(label="Cluster ID")
                 plt.tight_layout()
-                plt.savefig(os.path.join(base_path,f"plots/2d_png/{ds_id_prefix}_{run:02d}run_2d.png"), dpi=150)
+                plt.savefig(os.path.join(base_path,f"plots/2d_png/{ds_id_prefix}_{run:05d}run_2d.png"), dpi=150)
                 plt.close()
 
                 X_mapped = embed_2d_data(X_scaled, output_dim=output_dim)
-                np.savetxt(os.path.join(base_path,f"data/highmapped_xd/{ds_id_prefix}_{run:02d}run_{output_dim}d.txt"), X_mapped, fmt="%.6f")
+                np.savetxt(os.path.join(base_path,f"data/input/highmapped_xd/{ds_id_prefix}_{run:05d}run_{output_dim}d.txt"), X_mapped, fmt="%.6f")
 
                 X_3d = X_mapped if output_dim == 3 else embed_2d_data(X_scaled, output_dim=3)
-                np.savetxt(os.path.join(base_path,f"data/highmapped_3d/{ds_id_prefix}_{run:02d}run_3d.txt"), X_3d, fmt="%.6f")
+                np.savetxt(os.path.join(base_path,f"data/input/highmapped_3d/{ds_id_prefix}_{run:05d}run_3d.txt"), X_3d, fmt="%.6f")
                 
 
                 fig = go.Figure(data=[
@@ -223,9 +223,9 @@ def generate_worm_datasets_batch(
                     )
                 ])
                 fig.update_layout(title=f"3D Embedding {ds_id_prefix}", scene=dict(xaxis_title='Dim 1', yaxis_title='Dim 2', zaxis_title='Dim 3'))
-                fig.write_html(os.path.join(base_path,f"plots/3d_html/{ds_id_prefix}_{run:02d}run_3d.html"))
+                fig.write_html(os.path.join(base_path,f"plots/3d_html/{ds_id_prefix}_{run:05d}run_3d.html"))
 
-                np.savetxt(os.path.join(base_path,f"data/true_labels/{ds_id_prefix}_{run:02d}run_labels.txt"), labels.astype(int), fmt="%d")
+                np.savetxt(os.path.join(base_path,f"data/input/true_labels/{ds_id_prefix}_{run:05d}run_labels.txt"), labels.astype(int), fmt="%d")
 
 
 if __name__ == "__main__":
@@ -241,15 +241,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    noise_mult_list = [0,10,20,50,100]
-    output_dims_list = [10, 100, 1000]
+    noise_mult_list = [0]
+    output_dims_list = [3]
+    datasets_per_combo=10000
 
 
     generate_worm_datasets_batch(
         base_path=BASE_PATH,
         noise_mult_list=noise_mult_list,
         output_dims_list=output_dims_list,
-        datasets_per_combo=args.datasets_per_combo,
+        datasets_per_combo=datasets_per_combo,
         max_clusters=args.max_clusters,
         dims=args.dims,
         stepl=args.stepl,
