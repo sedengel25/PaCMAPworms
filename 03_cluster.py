@@ -48,7 +48,7 @@ def process_config(row, run_path):
     n_points = X.shape[0]
 
     # Labels laden
-    labels_file = os.path.join(run_path, "data", "input", "true_labels", f"{base_clean}_labels{ext}")
+    labels_file = os.path.join(out_path,f"{base_clean}_true_labels{ext}")
     if not os.path.exists(labels_file):
         raise FileNotFoundError(f"Labels file not found: {labels_file}")
     y_true = np.loadtxt(labels_file).astype(int)

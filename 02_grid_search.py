@@ -42,6 +42,7 @@ for file in embedded_files:
     target_dim = 2
     print(target_dims)
     ms = 30
+    target_repeats = 5
     for method in dimred_methods:
         # tSNE nur für 2D und 3D
         #if method == "tSNE":
