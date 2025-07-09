@@ -70,6 +70,7 @@ def process_config(row, run_path):
 
     # DimRed
     method = row['dimred_method']
+    method_run = row['rep']
     target_dim = int(row['target_dim'])
     nn = int(row['n_neighbors'])
 
@@ -86,7 +87,7 @@ def process_config(row, run_path):
         raise ValueError(f"Unknown dimred method: {method}")
 
     X_red = dr.fit_transform(X).astype(np.float64)
-    embedded_file = os.path.join(out_path, f"{base_clean}_{method}_{target_dim}d_emb{ext}")
+    embedded_file = os.path.join(out_path, f"{base_clean}_{method}_{method_run}_{target_dim}d_emb{ext}")
     np.savetxt(embedded_file, X_red, fmt='%.6f')
 
     # HDBSCAN auf Embedding
@@ -99,7 +100,7 @@ def process_config(row, run_path):
     n_noise_r = int((labels_pred_red == -1).sum())
     n_clusters_r = len(set(labels_pred_red)) - (1 if -1 in labels_pred_red else 0)
 
-    pred_red_file = os.path.join(out_path, f"{base_clean}_{target_dim}d_emb_pred_labels{ext}")
+    pred_red_file = os.path.join(out_path, f"{base_clean}_{method}_{method_run}_{target_dim}d_emb_pred_labels{ext}")
     np.savetxt(pred_red_file, labels_pred_red, fmt='%d')
 
     # Ergebnisse zurückgeben
