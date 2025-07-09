@@ -51,31 +51,33 @@ for file in embedded_files:
         #method_dims = target_dims
         #for target_dim in method_dims:
             for mcs in min_cluster_sizes:
-                #samples = [round(mcs * 0.5), round(mcs * 0.75), mcs]
-                if method == "PaCMAP":
-                    #for nn in pacmap_n_neighbors:
-                        #for ms in samples:
-                            configs.append({
-                                "file": file,
-                                "dimred_method": method,
-                                "input_dim":xd,
-                                "target_dim": target_dim,
-                                "min_cluster_size": mcs,
-                                "min_samples": ms,
-                                "n_neighbors": nn
-                            })
-                else:
-                    #for ms in samples:
-                        configs.append({
-                            "file": file,
-                            "dimred_method": method,
-                            "input_dim":xd,
-                            "target_dim": target_dim,
-                            "min_cluster_size": mcs,
-                            "min_samples": ms,
-                            "n_neighbors": 0
-                        })
-
+                for rep in range(1, target_repeats + 1):
+                  #samples = [round(mcs * 0.5), round(mcs * 0.75), mcs]
+                  if method == "PaCMAP":
+                      #for nn in pacmap_n_neighbors:
+                          #for ms in samples:
+                    configs.append({
+                        "file": file,
+                        "dimred_method": method,
+                        "input_dim": xd,
+                        "target_dim": target_dim,
+                        "min_cluster_size": mcs,
+                        "min_samples": ms,
+                        "n_neighbors": nn,
+                        "rep": rep
+                    })
+                  else:
+                      #for ms in samples:
+                    configs.append({
+                        "file": file,
+                        "dimred_method": method,
+                        "input_dim": xd,
+                        "target_dim": target_dim,
+                        "min_cluster_size": mcs,
+                        "min_samples": ms,
+                        "n_neighbors": nn,
+                        "rep": rep
+                    })
 # Als CSV speichern
 df = pd.DataFrame(configs)
 out_csv = os.path.join(RUN_PATH, f"grid_search_{RUN_ID}.csv")
