@@ -86,7 +86,7 @@ def process_config(row, run_path):
         raise ValueError(f"Unknown dimred method: {method}")
 
     X_red = dr.fit_transform(X).astype(np.float64)
-    embedded_file = os.path.join(out_path, f"{base_clean}_{target_dim}d_emb{ext}")
+    embedded_file = os.path.join(out_path, f"{base_clean}_{method}_{target_dim}d_emb{ext}")
     np.savetxt(embedded_file, X_red, fmt='%.6f')
 
     # HDBSCAN auf Embedding
