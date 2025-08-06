@@ -73,16 +73,17 @@ def process_config(row, run_path):
     method_run = row['rep']
     target_dim = int(row['target_dim'])
     nn = int(row['n_neighbors'])
+    seed = 42 + int(method_run)
 
     if method == 'tSNE':
-        dr = TSNE(n_components=target_dim, init='random', random_state=42,
+        dr = TSNE(n_components=target_dim, init='random', random_state=seed,
                   method='exact' if target_dim > 3 else 'barnes_hut')
     elif method == 'UMAP':
-        dr = umap.UMAP(n_components=target_dim, random_state=42)
+        dr = umap.UMAP(n_components=target_dim, random_state=seed)
     elif method == 'TriMap':
-        dr = trimap.TRIMAP(n_dims=target_dim)
+        dr = trimap.TRIMAP(n_dims=target_dim, random_state=seed)
     elif method == 'PaCMAP':
-        dr = pacmap.PaCMAP(n_components=target_dim, n_neighbors=nn, random_state=42)
+        dr = pacmap.PaCMAP(n_components=target_dim, n_neighbors=nn, random_state=seed)
     else:
         raise ValueError(f"Unknown dimred method: {method}")
 
