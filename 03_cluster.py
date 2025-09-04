@@ -34,7 +34,8 @@ def process_config(row, run_path):
 
     filename_rel = row['file']  # enthält z.B. "04_0nm_03run_10d.txt"
     base_clean, ext = remove_last_postfix_before_extension(filename_rel)
-    dir_path = os.path.join(run_path, "data", "input", "highmapped_xd")
+    in_path = os.path.join(run_path, "data", "input")
+    dir_path = os.path.join(in_path, "highmapped_xd")
     filename = os.path.join(dir_path, filename_rel)
     out_path = os.path.join(run_path, "data", "output") 
     os.makedirs(out_path, exist_ok=True)         
@@ -48,7 +49,7 @@ def process_config(row, run_path):
     n_points = X.shape[0]
 
     # Labels laden
-    labels_file = os.path.join(out_path,f"{base_clean}_true_labels{ext}")
+    labels_file = os.path.join(in_path, f"true_labels/{base_clean}_labels{ext}")
     if not os.path.exists(labels_file):
         raise FileNotFoundError(f"Labels file not found: {labels_file}")
     y_true = np.loadtxt(labels_file).astype(int)
