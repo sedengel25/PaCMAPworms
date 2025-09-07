@@ -1,13 +1,13 @@
 library(tidyverse)
 library(here)
-run <- "20250708_1538"
+run <- "20250807_1214"
 run.path <- here("runs", run, "data", "output")
-df <- read_csv(paste0("results_", run, ".csv"))
+df <- read_csv(here("results", paste0("results_", run, ".csv")))
 
 
 
-df <- df %>%
-  filter(dimred_method %in% c("PaCMAP", "tSNE"))
+# df <- df %>%
+#   filter(dimred_method %in% c("PaCMAP", "tSNE"))
 df <- df %>%
   select(-c(DBCV_orig, DBCV_embedded_m, DBCV_embedded_e))
 unique(df$noise_mult)
@@ -15,7 +15,7 @@ df <- df %>%
   filter(noise_mult == 0)
 summary(df)
 str(df)
-head(df %>% as.data.frame())
+head(df %>% as.data.frame(), 50)
 
 # df <- df %>%
 #   mutate(
@@ -25,12 +25,15 @@ head(df %>% as.data.frame())
 df <- df %>%
   mutate(diff = ARI_embedded - ARI_orig)
 
-df %>%
-  filter(file == "02683_0nm_02682run_3d.txt")
+# df %>%
+#   filter(file == "02683_0nm_02682run_3d.txt")
 df %>%
   arrange(diff) %>% as.data.frame() %>% head(10)
 df %>%
-  arrange(desc(diff)) %>% as.data.frame() %>% head(10)
+  arrange(desc(diff)) %>% as.data.frame() %>% 
+  head(20) %>%
+  pull(file) %>%
+  table()
 # id <- 2567
 # run <- id - 1
 # file <- sprintf("%05d_0nm_%05drun", id, run)
