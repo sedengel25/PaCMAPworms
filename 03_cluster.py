@@ -82,7 +82,7 @@ def process_config(row, run_path):
     elif method == 'UMAP':
         dr = umap.UMAP(n_components=target_dim, random_state=seed)
     elif method == 'TriMap':
-        dr = trimap.TRIMAP(n_dims=target_dim, random_state=seed)
+        dr = trimap.TRIMAP(n_dims=target_dim) 
     elif method == 'PaCMAP':
         dr = pacmap.PaCMAP(n_components=target_dim, n_neighbors=nn, random_state=seed)
     else:
