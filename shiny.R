@@ -12,7 +12,7 @@ ui <- fluidPage(
   titlePanel("PaCMAPworms – Showcase Results"),
   sidebarLayout(
     sidebarPanel(
-      uiOutput("run_picker"),
+      uiOutput("run"),
       hr(),
       helpText("Wähle im Tab 'Table' eine Zeile. Der Tab 'Original' zeigt dann die zugehörige Datei aus dem gewählten Unterordner.")
     ),
@@ -24,8 +24,6 @@ ui <- fluidPage(
                            verbatimTextOutput("sel_info")
                   ),
                   tabPanel("Original",
-                           h4("Datei-Vorschau"),
-                           verbatimTextOutput("resolved_file"),
                            plotlyOutput("org_plot3d", height = "600px")
                   )
       )
@@ -35,60 +33,44 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   
-  # verfügbare Runs (nur unter showcase/runs)
-  runs_available <- reactive({
+
+  runs.avail <- reactive({
     dir_path <- here("showcase", "runs")
     if (!dir.exists(dir_path)) return(character(0))
     list.dirs(dir_path, full.names = FALSE, recursive = FALSE)
   })
   
-  output$run_picker <- renderUI({
-    runs <- runs_available()
+  output$run <- renderUI({
+    runs <- runs.avail()
     selectInput(
       "run", "Run (aus showcase/runs):",
       choices = runs, selected = if (length(runs)) runs[[1]] else NULL
     )
   })
   
-  # Unterordner (z. B. emb, org, true_labels, ...)
-  subdirs_for_run <- reactive({
-    req(input$run)
-    base <- here("showcase", "runs", input$run)
-    if (!dir.exists(base)) return(character(0))
-    dirs <- list.dirs(base, full.names = FALSE, recursive = FALSE)
-    # nur unmittelbare Unterordner, keine leeren Zeichen
-    dirs[nzchar(dirs)]
-  })
-  
 
-  
-  # CSV laden: results/results_<run>.csv
-  df_raw <- reactive({
+  df.res <- reactive({
     req(input$run)
     csv_path <- here("results", paste0("results_", input$run, ".csv"))
     validate(need(file.exists(csv_path), paste0("Datei nicht gefunden: ", csv_path)))
     readr::read_csv(csv_path, show_col_types = FALSE)
   })
-  
-  # Deine Transformationsschritte
-  df_view <- reactive({
-    df <- df_raw() %>%
-      filter(dimred_method %in% c("tSNE")) %>%
+
+  # transform result table 
+  df.view <- reactive({
+    df <- df.res() %>%
       select(-any_of(c("DBCV_orig", "DBCV_embedded_m", "DBCV_embedded_e"))) %>%
-      filter(noise_mult == 0) %>%
       mutate(
         diff = ARI_embedded - ARI_orig,
-        # alles ab "run" behalten, danach alles weg
         file = str_replace(file, "(run).*", "\\1")
       )
     df
   })
   
-  
-  # Tabelle mit Single-Row-Selection
+  # display result table
   output$tbl <- renderDT({
     datatable(
-      df_view(),
+      df.view(),
       rownames = FALSE,
       filter = "top",
       selection = "single",
@@ -96,58 +78,40 @@ server <- function(input, output, session) {
     )
   })
   
-  # Ausgewählte Zeile + Basics anzeigen
-  output$sel_info <- renderPrint({
-    s <- input$tbl_rows_selected
-    df <- df_view()
-    if (length(s) != 1) {
-      cat("Keine Zeile gewählt.\nWähle eine Zeile in der Tabelle aus.")
-      return(invisible(NULL))
-    }
-    row <- df[s, , drop = FALSE]
-    sel <- row %>% select(any_of(c("file", "dimred_method", "rep")))
-    print(sel)
-  })
   
-  # Ausgewählte Datei im Unterordner finden
-  resolved_path <- reactive({
+  file.id <- reactive({
     req(input$run)
     s <- input$tbl_rows_selected
     validate(need(length(s) == 1, "Bitte wähle eine Zeile in der Tabelle."))
-    df <- df_view()
+    df <- df.view()
     row <- df[s, , drop = FALSE]
     
     validate(need("file" %in% names(row), "Spalte 'file' fehlt im results-CSV."))
-    file_key <- as.character(row$file[1])
-    base_dir <- here("showcase", "runs", input$run)
-    file <- here(base_dir, "org", paste0(file_key, "_3d.txt"))
-    print(file)
-    file
+    file.id <- as.character(row$file[1])
+    file.id
   })
   
-  output$resolved_file <- renderText({
-    paste("Datei:", resolved_path())
-  })
+
   
-  # Datei lesen (heuristisch) und plotten:
-  # - Versuche read_table() (whitespace-getrennt) und fallweise read_csv()
-  # - Wähle die ersten zwei numerischen Spalten zum Plotten
-  load_selected_file <- reactive({
-    path <- resolved_path()
-    
-    df_try <- tryCatch(
-      readr::read_table(path, show_col_types = FALSE, progress = FALSE),
-      error = function(e) NULL
-    )
-    if (is.null(df_try)) {
-      df_try <- tryCatch(
-        readr::read_csv(path, show_col_types = FALSE, progress = FALSE),
-        error = function(e) NULL
-      )
-    }
-    validate(need(!is.null(df_try), paste0("Datei konnte nicht geparst werden: ", path)))
-    df_try
-  })
+
+
+  # load_selected_file <- reactive({
+  #   path <- resolved_path()
+  #   print(path)
+  #   df_try <- tryCatch(
+  #     readr::read_table(path, show_col_types = FALSE, progress = FALSE),
+  #     error = function(e) NULL
+  #   )
+  #   if (is.null(df_try)) {
+  #     df_try <- tryCatch(
+  #       readr::read_csv(path, show_col_types = FALSE, progress = FALSE),
+  #       error = function(e) NULL
+  #     )
+  #   }
+  #   validate(need(!is.null(df_try), paste0("Datei konnte nicht geparst werden: ", path)))
+  #   
+  #   df_try
+  # })
   
   pick_three_numeric <- function(dat) {
     num_cols <- names(dat)[map_lgl(dat, is.numeric)]
