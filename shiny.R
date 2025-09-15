@@ -6,30 +6,55 @@ library(here)
 library(readr)
 library(ggplot2)
 library(plotly)
-
+library(parallelDist)
+library(scales)
 
 ui <- fluidPage(
   titlePanel("PaCMAPworms – Showcase Results"),
   sidebarLayout(
     sidebarPanel(
+      width = 2,                             # << kleiner Sidebar-Streifen
       uiOutput("run"),
       hr(),
-      helpText("Wähle im Tab 'Table' eine Zeile. Der Tab 'Original' zeigt dann die zugehörige Datei aus dem gewählten Unterordner.")
+      helpText("Wähle im Tab 'Table' eine Zeile. Der Tab 'Plot' zeigt dann die zugehörige Datei aus dem gewählten Unterordner."),
+      selectInput(                           # << Filter im Sidebar lassen (optional)
+        "color_by", "Färbung nach:",
+        choices = c("Predicted" = "pred_labels", "True" = "true_labels"),
+        selected = "pred_labels"
+      )
     ),
     mainPanel(
+      width = 10,
       tabsetPanel(id = "tabs",
                   tabPanel("Table",
                            DTOutput("tbl"),
                            br(),
                            verbatimTextOutput("sel_info")
                   ),
-                  tabPanel("Original",
-                           plotlyOutput("org_plot3d", height = "600px")
+                  tabPanel("Plot",
+                           # zwei Plots NEBENEINANDER
+                           fluidRow(
+                             column(6,
+                                    plotlyOutput("org_plot3d", height = "70vh")  # höhe relativ zur Viewport-Höhe
+                             ),
+                             column(6,
+                                    plotlyOutput("emb_plot2d", height = "70vh")
+                             )
+                           ),
+                           fluidRow(
+                             column(6,
+                                    plotlyOutput("org_dist_density", height = "70vh")  # höhe relativ zur Viewport-Höhe
+                             ),
+                             column(6,
+                                    plotlyOutput("emb_dist_density", height = "70vh")
+                             )
+                           )
                   )
       )
     )
   )
 )
+
 
 server <- function(input, output, session) {
   
@@ -63,7 +88,13 @@ server <- function(input, output, session) {
       mutate(
         diff = ARI_embedded - ARI_orig,
         file = str_replace(file, "(run).*", "\\1")
-      )
+      ) %>%
+      group_by(file, dimred_method) %>%
+      mutate(
+        diff_mean   = mean(diff, na.rm = TRUE),
+        diff_median = median(diff, na.rm = TRUE)
+      ) %>%
+      ungroup()
     df
   })
   
@@ -78,79 +109,280 @@ server <- function(input, output, session) {
     )
   })
   
+
+  selected_row <- reactive({
+    req(input$tbl_rows_selected)
+    df.view()[input$tbl_rows_selected, , drop = FALSE]
+  })
   
   file.id <- reactive({
-    req(input$run)
-    s <- input$tbl_rows_selected
-    validate(need(length(s) == 1, "Bitte wähle eine Zeile in der Tabelle."))
-    df <- df.view()
-    row <- df[s, , drop = FALSE]
-    
-    validate(need("file" %in% names(row), "Spalte 'file' fehlt im results-CSV."))
-    file.id <- as.character(row$file[1])
-    file.id
+    as.character(selected_row()$file[1])
   })
   
-
+  dimred_method <- reactive({
+    as.character(selected_row()$dimred_method[1])
+  })
   
-
-
-  # load_selected_file <- reactive({
-  #   path <- resolved_path()
-  #   print(path)
-  #   df_try <- tryCatch(
-  #     readr::read_table(path, show_col_types = FALSE, progress = FALSE),
-  #     error = function(e) NULL
-  #   )
-  #   if (is.null(df_try)) {
-  #     df_try <- tryCatch(
-  #       readr::read_csv(path, show_col_types = FALSE, progress = FALSE),
-  #       error = function(e) NULL
-  #     )
-  #   }
-  #   validate(need(!is.null(df_try), paste0("Datei konnte nicht geparst werden: ", path)))
-  #   
-  #   df_try
-  # })
+  rep_id <- reactive({
+    as.character(selected_row()$rep[1])
+  })
   
-  pick_three_numeric <- function(dat) {
-    num_cols <- names(dat)[map_lgl(dat, is.numeric)]
-    validate(need(length(num_cols) >= 3,
-                  "Weniger als drei numerische Spalten gefunden – 3D-Plot nicht möglich."))
-    num_cols[1:3]
-  }
+  load.org.data <- reactive({
+    run <- req(input$run)
+    here("showcase", "runs", run, "org", paste0(file.id(), "_3d.txt"))
+  })
   
+  
+  load.emb.data <- reactive({
+    run <- req(input$run)
+    base.dir <- here("showcase", "runs", run, "emb")
+    file <- here(base.dir, paste0(file.id(), 
+                                  "_", 
+                                  dimred_method(), 
+                                  "_", 
+                                  rep_id(), 
+                                  "_2d_emb.txt"))
+    file
+  })
+  
+  
+  load.org.pred.labels <- reactive({
+    file.id <- file.id()
+    run <- req(input$run)
+    base.dir <- here("showcase", "runs", run)
+    labels <- here(base.dir, "pred_labels_org", paste0(file.id, "_pred_labels.txt"))
+    labels
+  })
+  
+  
+  load.emb.pred.labels <- reactive({
+    run <- req(input$run)
+    base.dir <- here("showcase", "runs", run, "pred_labels_emb")
+    labels <- here(base.dir, paste0(file.id(), 
+                                  "_", 
+                                  dimred_method(), 
+                                  "_", 
+                                  rep_id(), 
+                                  "_2d_emb_pred_labels.txt"))
+    labels
+  })
+  
+  
+  load.true.labels <- reactive({
+    file.id <- file.id()
+    run <- req(input$run)
+    base.dir <- here("showcase", "runs", run)
+    labels.true <- here(base.dir, "true_labels", paste0(file.id, "_labels.txt"))
+    labels.true
+  })
+
   output$org_plot3d <- renderPlotly({
-    dat <- load_selected_file()
-    xyz <- pick_three_numeric(dat)
+    df.char <- load.org.data()
+    pred.path <- load.org.pred.labels()
+    true.path <- load.true.labels()
+    
+    df <- readr::read_table(df.char, col_names = FALSE)
+    df$pred_labels <- readr::read_table(pred.path, col_names = FALSE) %>% pull()
+    df$true_labels <- readr::read_table(true.path, col_names = FALSE) %>% pull()
+    
+    df$color_key <- as.factor(df[[input$color_by]])
     
     plot_ly(
-      data = dat,
-      x = ~.data[[xyz[1]]],
-      y = ~.data[[xyz[2]]],
-      z = ~.data[[xyz[3]]],
-      type = "scatter3d",
-      mode = "markers",
+      data = df,
+      x = ~X1, y = ~X2, z = ~X3,
+      type = "scatter3d", mode = "markers",
+      color = ~color_key, colors = "Set1",
       marker = list(size = 2, opacity = 0.7)
     ) %>%
-      layout(
-        scene = list(
-          xaxis = list(title = xyz[1]),
-          yaxis = list(title = xyz[2]),
-          zaxis = list(title = xyz[3]),
-          aspectmode = "data"
-          ),
-          margin = list(l = 0, r = 0, b = 0, t = 0)
-        )
+      layout(legend = list(title = list(
+        text = if (input$color_by == "pred_labels") "Predicted" else "True"
+      )))
   })
-    
   
-  # Optional: bei Auswahl in der Tabelle automatisch auf den Original-Tab springen
+  
+  output$emb_plot2d <- renderPlotly({
+    df.char <- load.emb.data()
+    pred.path <- load.emb.pred.labels()
+    true.path <- load.true.labels()
+    
+    df <- readr::read_table(df.char, col_names = FALSE)
+    df$pred_labels <- readr::read_table(pred.path, col_names = FALSE) %>% pull()
+    df$true_labels <- readr::read_table(true.path, col_names = FALSE) %>% pull()
+    
+    df$color_key <- as.factor(df[[input$color_by]])
+    #df$dimred_key <- as.factor(df[[input$dimred]])
+    plot_ly(
+      data = df,
+      x = ~X1, y = ~X2,
+      type = "scatter", mode = "markers",
+      color = ~color_key, colors = "Set1",
+      marker = list(size = 2, opacity = 0.7)
+    ) 
+  })
+  
+  
+  output$org_dist_density <- renderPlotly({
+    df <- readr::read_table(load.org.data(), col_names = FALSE)
+    X  <- df %>% select(X1, X2, X3) %>% as.matrix()
+    d  <- parallelDist::parDist(X, method = "euclidean") %>% as.vector()
+    d <- scales::rescale(d, to = c(0, 1)) 
+    g <- tibble(distance = d) %>%
+      ggplot(aes(distance)) + geom_density() +
+      labs(title = "Original 3D – Distanzdichte", x = "Distanz", y = "Dichte") +
+      theme_minimal()
+    ggplotly(g)
+  })
+  
+  output$emb_dist_density <- renderPlotly({
+    df <- readr::read_table(load.emb.data(), col_names = FALSE)
+    X  <- df %>% select(X1, X2) %>% as.matrix()
+    d  <- parallelDist::parDist(X, method = "euclidean") %>% as.vector()
+    d <- scales::rescale(d, to = c(0, 1)) 
+    
+    g <- tibble(distance = d) %>%
+      ggplot(aes(distance)) + geom_density() +
+      labs(title = paste0(dimred_method(), " 2D – Distanzdichte"), x = "Distanz", y = "Dichte") +
+      theme_minimal()
+    ggplotly(g)
+  })
+  
+  
+
   observeEvent(input$tbl_rows_selected, {
     if (length(input$tbl_rows_selected) == 1) {
-      updateTabsetPanel(session, "tabs", selected = "Original")
+      updateTabsetPanel(session, "tabs", selected = "Plot")
     }
   })
 }
 
 shinyApp(ui, server)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
