@@ -86,7 +86,7 @@ server <- function(input, output, session) {
   # transform result table 
   df.view <- reactive({
     df <- df.res() %>%
-      select(-any_of(c("DBCV_orig", "DBCV_embedded_m", "DBCV_embedded_e"))) %>%
+      select(-any_of(c("DBCV_orig","DBCV_embedded_m", "DBCV_embedded_e"))) %>%
       mutate(
         diff = ARI_embedded - ARI_orig,
         file = str_replace(file, "(run).*", "\\1")
