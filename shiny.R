@@ -8,6 +8,8 @@ library(ggplot2)
 library(plotly)
 library(parallelDist)
 library(scales)
+library(dbscan)
+options(warn = -1)
 
 ui <- fluidPage(
   titlePanel("PaCMAPworms – Showcase Results"),
@@ -95,6 +97,11 @@ server <- function(input, output, session) {
         diff_median = median(diff, na.rm = TRUE)
       ) %>%
       ungroup()
+    base.dir <- here("showcase", "runs", run)
+    df.gini <- readr::read_delim(here(base.dir, "gini.txt"), col_names = TRUE, delim = " ")
+    print(head(df.gini))
+    df <- df %>%
+      left_join(df.gini, by = c("file" = "file"))
     df
   })
   
@@ -176,28 +183,7 @@ server <- function(input, output, session) {
     labels.true
   })
 
-  output$org_plot3d <- renderPlotly({
-    df.char <- load.org.data()
-    pred.path <- load.org.pred.labels()
-    true.path <- load.true.labels()
-    
-    df <- readr::read_table(df.char, col_names = FALSE)
-    df$pred_labels <- readr::read_table(pred.path, col_names = FALSE) %>% pull()
-    df$true_labels <- readr::read_table(true.path, col_names = FALSE) %>% pull()
-    
-    df$color_key <- as.factor(df[[input$color_by]])
-    
-    plot_ly(
-      data = df,
-      x = ~X1, y = ~X2, z = ~X3,
-      type = "scatter3d", mode = "markers",
-      color = ~color_key, colors = "Set1",
-      marker = list(size = 2, opacity = 0.7)
-    ) %>%
-      layout(legend = list(title = list(
-        text = if (input$color_by == "pred_labels") "Predicted" else "True"
-      )))
-  })
+
   
   
   output$emb_plot2d <- renderPlotly({
@@ -208,43 +194,129 @@ server <- function(input, output, session) {
     df <- readr::read_table(df.char, col_names = FALSE)
     df$pred_labels <- readr::read_table(pred.path, col_names = FALSE) %>% pull()
     df$true_labels <- readr::read_table(true.path, col_names = FALSE) %>% pull()
+    df <- df %>% mutate(id = row_number())
     
     df$color_key <- as.factor(df[[input$color_by]])
     #df$dimred_key <- as.factor(df[[input$dimred]])
-    plot_ly(
-      data = df,
-      x = ~X1, y = ~X2,
-      type = "scatter", mode = "markers",
-      color = ~color_key, colors = "Set1",
-      marker = list(size = 2, opacity = 0.7)
-    ) 
-  })
-  
-  
-  output$org_dist_density <- renderPlotly({
-    df <- readr::read_table(load.org.data(), col_names = FALSE)
-    X  <- df %>% select(X1, X2, X3) %>% as.matrix()
-    d  <- parallelDist::parDist(X, method = "euclidean") %>% as.vector()
-    d <- scales::rescale(d, to = c(0, 1)) 
-    g <- tibble(distance = d) %>%
-      ggplot(aes(distance)) + geom_density() +
-      labs(title = "Original 3D – Distanzdichte", x = "Distanz", y = "Dichte") +
-      theme_minimal()
-    ggplotly(g)
-  })
-  
-  output$emb_dist_density <- renderPlotly({
-    df <- readr::read_table(load.emb.data(), col_names = FALSE)
-    X  <- df %>% select(X1, X2) %>% as.matrix()
-    d  <- parallelDist::parDist(X, method = "euclidean") %>% as.vector()
-    d <- scales::rescale(d, to = c(0, 1)) 
+
+    picked <- sel_keys()
+
     
-    g <- tibble(distance = d) %>%
-      ggplot(aes(distance)) + geom_density() +
-      labs(title = paste0(dimred_method(), " 2D – Distanzdichte"), x = "Distanz", y = "Dichte") +
-      theme_minimal()
-    ggplotly(g)
+    if (length(picked) == 0) {
+      # Normal: färben nach Labels
+      plot_ly(
+        data = df,
+        x = ~X1, y = ~X2,
+        type = "scatter", mode = "markers",
+        color = ~color_key, colors = "Set1",
+        key = ~id, source = "emb_select",
+        marker = list(size = 2, opacity = 0.7)
+      )
+    } else {
+      # Auswahl vorhanden: rot vs. hellgrau
+      df <- df %>%
+        mutate(
+          is_sel = id %in% picked,
+          col    = ifelse(is_sel, "red", "lightgray"),
+          sz     = ifelse(is_sel, 4, 2),
+          op     = ifelse(is_sel, 0.3, 0.05)
+        )
+      
+      plot_ly(
+        data = df,
+        x = ~X1, y = ~X2,
+        type = "scatter", mode = "markers",
+        color = ~I(col),
+        key = ~id, source = "emb_select",
+        marker = list(size = ~sz, opacity = ~op),
+        showlegend = FALSE
+      )
+    }
   })
+  
+  
+  sel_keys <- reactive({
+    s <- event_data("plotly_selected", source = "emb_select")
+    if (is.null(s) || nrow(s) == 0) integer(0) else as.integer(s$key)
+  })
+  
+  
+  output$org_plot3d <- renderPlotly({
+    df.char <- load.org.data()
+    pred.path <- load.org.pred.labels()
+    true.path <- load.true.labels()
+    
+    df <- readr::read_table(df.char, col_names = FALSE)
+
+    k <- 100
+    knn.d <- kNN(x = as.matrix(df), k = k)
+    r.k   <- knn.d$dist[, k] + 1e-12              
+    vol3  <- (4/3) * pi * (r.k^3) 
+    density.knn <- k / vol3                    
+    df <- df %>% mutate(density = density.knn)
+    df <- df %>% mutate(id = row_number())
+    df$pred_labels <- readr::read_table(pred.path, col_names = FALSE) %>% pull()
+    df$true_labels <- readr::read_table(true.path, col_names = FALSE) %>% pull()
+    
+    df$color_key <- as.factor(df[[input$color_by]])
+    
+    picked <- sel_keys()
+    if (length(picked) == 0) {
+      plot_ly(
+        data = df,
+        x = ~X1, y = ~X2, z = ~X3,
+        type = "scatter3d", mode = "markers",
+        color = ~color_key, colors = "Set1",
+        marker = list(size = 2, opacity = 0.7)
+      ) %>%
+        layout(legend = list(title = list(
+          text = if (input$color_by == "pred_labels") "Predicted" else "True"
+        )))
+    } else {
+      df <- df %>%
+        mutate(
+          is_sel = id %in% picked,
+          col    = ifelse(is_sel, "red", "lightgray"),
+          sz     = ifelse(is_sel, 4, 2),
+          op     = ifelse(is_sel, 0.3, 0.05)
+        )
+      
+      plot_ly(
+        data = df,
+        x = ~X1, y = ~X2, z = ~X3,
+        type = "scatter3d", mode = "markers",
+        color = ~I(col),                        # explizite Farben verwenden
+        marker = list(size = ~sz, opacity = ~op),
+        showlegend = FALSE
+      )
+    }
+    
+  })
+  
+  # output$org_dist_density <- renderPlotly({
+  #   df <- readr::read_table(load.org.data(), col_names = FALSE)
+  #   X  <- df %>% select(X1, X2, X3) %>% as.matrix()
+  #   d  <- parallelDist::parDist(X, method = "euclidean") %>% as.vector()
+  #   d <- scales::rescale(d, to = c(0, 1)) 
+  #   g <- tibble(distance = d) %>%
+  #     ggplot(aes(distance)) + geom_density() +
+  #     labs(title = "Original 3D – Distanzdichte", x = "Distanz", y = "Dichte") +
+  #     theme_minimal()
+  #   ggplotly(g)
+  # })
+  # 
+  # output$emb_dist_density <- renderPlotly({
+  #   df <- readr::read_table(load.emb.data(), col_names = FALSE)
+  #   X  <- df %>% select(X1, X2) %>% as.matrix()
+  #   d  <- parallelDist::parDist(X, method = "euclidean") %>% as.vector()
+  #   d <- scales::rescale(d, to = c(0, 1)) 
+  #   
+  #   g <- tibble(distance = d) %>%
+  #     ggplot(aes(distance)) + geom_density() +
+  #     labs(title = paste0(dimred_method(), " 2D – Distanzdichte"), x = "Distanz", y = "Dichte") +
+  #     theme_minimal()
+  #   ggplotly(g)
+  # })
   
   
 
@@ -256,133 +328,3 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui, server)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
