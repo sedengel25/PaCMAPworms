@@ -99,9 +99,12 @@ server <- function(input, output, session) {
       ungroup()
     base.dir <- here("showcase", "runs", run)
     df.gini <- readr::read_delim(here(base.dir, "gini.txt"), col_names = TRUE, delim = " ")
+    df.cvi <- readr::read_delim(here(base.dir, "cvi.txt"), col_names = TRUE, delim = " ")
     print(head(df.gini))
     df <- df %>%
       left_join(df.gini, by = c("file" = "file"))
+    df <- df %>%
+      left_join(df.cvi, by = c("file" = "file"))
     df
   })
   
